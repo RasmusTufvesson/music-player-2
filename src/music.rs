@@ -1,11 +1,12 @@
-use std::{fs::File, io::BufReader, sync::mpsc::{Receiver, RecvTimeoutError}, time::Duration};
+use std::{fs::File, io::BufReader, sync::mpsc::{Receiver, RecvTimeoutError, Sender}, time::Duration};
 use rodio::{Decoder, Sink};
+
+use crate::app::StatusPacket;
 
 pub enum Packet {
     Play(usize),
-    Stop,
     Skip,
-    Continue,
+    Pause,
     Volume(f32),
     Loop,
 }
@@ -14,13 +15,17 @@ pub struct Player {
     songs: Vec<String>,
     sink: Sink,
     receiver: Receiver<Packet>,
+    sender: Sender<StatusPacket>,
     index: usize,
     looping: bool,
 }
 
 impl Player {
-    pub fn new(song_paths: Vec<String>, sink: Sink, receiver: Receiver<Packet>) -> Self {
-        Self { songs: song_paths, sink, receiver, index: 0, looping: false }
+    pub fn new(song_paths: Vec<String>, sink: Sink, receiver: Receiver<Packet>, sender: Sender<StatusPacket>) -> Self {
+        let player = Self { songs: song_paths, sink, receiver, sender, index: 0, looping: false };
+        player.pause();
+        player.queue_song(0);
+        player
     }
 
     fn queue_song(&self, song_index: usize) {
@@ -30,21 +35,19 @@ impl Player {
     }
 
     fn play(&mut self, song_index: usize) {
-        self.stop();
+        self.sink.stop();
         self.queue_song(song_index);
         self.index = song_index;
     }
 
-    fn stop(&self) {
-        self.sink.stop();
-    }
-
-    fn skip(&self) {
+    fn skip(&mut self) {
         self.sink.skip_one();
+        self.next();
     }
 
     fn next(&mut self) {
         if !self.looping {
+            self.sender.send(StatusPacket::NextSong).unwrap();
             self.index += 1;
             if self.index == self.songs.len() {
                 self.index = 0;
@@ -58,18 +61,14 @@ impl Player {
     }
 
     fn change_looping(&mut self) {
-        if self.looping {
-            self.looping = false;
-            self.skip();
+        self.looping = !self.looping;
+    }
+
+    fn pause(&self) {
+        if self.sink.is_paused() {
+            self.sink.play();
         } else {
-            self.looping = true;
-            self.sink.stop();
-            if self.index == 0 {
-                self.index = self.songs.len() - 1;
-            } else {
-                self.index -= 1;
-            }
-            self.queue_song(self.index);
+            self.sink.pause();
         }
     }
 
@@ -80,8 +79,7 @@ impl Player {
                     match packet {
                         Packet::Play(song) => self.play(song),
                         Packet::Skip => self.skip(),
-                        Packet::Stop => self.stop(),
-                        Packet::Continue => self.next(),
+                        Packet::Pause => self.pause(),
                         Packet::Volume(vol) => self.set_volume(vol),
                         Packet::Loop => self.change_looping(),
                     }
@@ -93,7 +91,7 @@ impl Player {
                     }
                 }
             }
-            if self.sink.len() == 1 {
+            if self.sink.len() == 0 {
                 self.next();
             }
         }
