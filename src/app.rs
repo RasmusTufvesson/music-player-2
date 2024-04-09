@@ -4,6 +4,7 @@ use crate::music::Packet;
 
 pub enum StatusPacket {
     NextSong,
+    Shuffle(Vec<usize>),
 }
 
 #[derive(PartialEq)]
@@ -48,6 +49,11 @@ impl eframe::App for App {
                         if self.index == self.songs.len() {
                             self.index = 0;
                         }
+                    }
+                    StatusPacket::Shuffle(vec) => {
+                        let shuffled = vec.iter().map(|x| self.songs[*x].clone()).collect();
+                        self.songs = shuffled;
+                        self.index = 0;
                     }
                 }
             }
@@ -100,6 +106,12 @@ impl eframe::App for App {
                     });
                 }
                 Tab::Songs => {
+                    ui.with_layout(egui::Layout { main_dir: egui::Direction::TopDown, main_wrap: false, main_align: eframe::emath::Align::Min, main_justify: false, cross_align: eframe::emath::Align::Center, cross_justify: true }, |ui: &mut egui::Ui| {
+                        if ui.button("Shuffle").clicked() {
+                            self.sender.send(Packet::Shuffle).unwrap();
+                        }
+                    });
+                    ui.add_space(ui.spacing().item_spacing.y);
                     egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
                         egui::Grid::new("songs").show(ui, |ui| {
                             for (i, song) in self.songs.iter().enumerate() {

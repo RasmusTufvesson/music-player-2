@@ -1,4 +1,5 @@
 use std::{fs::File, io::BufReader, sync::mpsc::{Receiver, RecvTimeoutError, Sender}, time::Duration};
+use rand::{rngs::ThreadRng, thread_rng, seq::SliceRandom};
 use rodio::{Decoder, Sink};
 
 use crate::app::StatusPacket;
@@ -9,6 +10,7 @@ pub enum Packet {
     Pause,
     Volume(f32),
     Loop,
+    Shuffle,
 }
 
 pub struct Player {
@@ -18,11 +20,12 @@ pub struct Player {
     sender: Sender<StatusPacket>,
     index: usize,
     looping: bool,
+    rng: ThreadRng,
 }
 
 impl Player {
     pub fn new(song_paths: Vec<String>, sink: Sink, receiver: Receiver<Packet>, sender: Sender<StatusPacket>) -> Self {
-        let player = Self { songs: song_paths, sink, receiver, sender, index: 0, looping: false };
+        let player = Self { songs: song_paths, sink, receiver, sender, index: 0, looping: false, rng: thread_rng() };
         player.pause();
         player.queue_song(0);
         player
@@ -72,6 +75,17 @@ impl Player {
         }
     }
 
+    fn shuffle(&mut self) {
+        let mut shuffle_vec: Vec<usize> = (0..self.songs.len()).collect();
+        shuffle_vec.shuffle(&mut self.rng);
+        let shuffled = shuffle_vec.iter().map(|x| self.songs[*x].clone()).collect();
+        self.songs = shuffled;
+        self.sender.send(StatusPacket::Shuffle(shuffle_vec)).unwrap();
+        self.index = 0;
+        self.sink.skip_one();
+        self.queue_song(self.index);
+    }
+
     pub fn main_loop(&mut self) {
         loop {
             match self.receiver.recv_timeout(Duration::from_millis(100)) {
@@ -82,6 +96,7 @@ impl Player {
                         Packet::Pause => self.pause(),
                         Packet::Volume(vol) => self.set_volume(vol),
                         Packet::Loop => self.change_looping(),
+                        Packet::Shuffle => self.shuffle(),
                     }
                 }
                 Err(error) => {

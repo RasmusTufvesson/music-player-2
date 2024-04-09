@@ -1927,6 +1927,7 @@ name = "music-player-2"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "rand",
  "rodio",
  "serde",
  "serde_json",

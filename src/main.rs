@@ -23,8 +23,8 @@ fn main() {
     let sink = Sink::try_new(&stream_handle).unwrap();
     let (tx, rx) = channel();
     let (tx_status, rx_status) = channel();
-    let mut player = Player::new(files, sink, rx, tx_status);
     thread::spawn(move|| {
+        let mut player = Player::new(files, sink, rx, tx_status);
         player.main_loop();
     });
     let _ = app::main(tx, rx_status, names);
