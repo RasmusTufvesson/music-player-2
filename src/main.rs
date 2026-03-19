@@ -1,6 +1,5 @@
 use std::{fs, sync::mpsc::channel, thread};
 use music::Player;
-use rodio::{OutputStream, Sink};
 use serde::Deserialize;
 
 mod music;
@@ -19,8 +18,9 @@ fn main() {
         files.push(path.to_str().unwrap().to_owned());
         names.push(path.file_stem().unwrap().to_str().unwrap().to_owned());
     }
-    let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-    let sink = Sink::try_new(&stream_handle).unwrap();
+    let mut handle = rodio::DeviceSinkBuilder::open_default_sink().unwrap();
+    handle.log_on_drop(false);
+    let sink = rodio::Player::connect_new(handle.mixer());
     let (tx, rx) = channel();
     let (tx_status, rx_status) = channel();
     thread::spawn(move|| {

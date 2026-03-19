@@ -1,6 +1,5 @@
 use std::{fs::File, io::BufReader, sync::mpsc::{Receiver, RecvTimeoutError, Sender}, time::Duration};
 use rand::{rngs::ThreadRng, thread_rng, seq::SliceRandom};
-use rodio::{Decoder, Sink};
 
 use crate::app::StatusPacket;
 
@@ -15,7 +14,7 @@ pub enum Packet {
 
 pub struct Player {
     songs: Vec<String>,
-    sink: Sink,
+    sink: rodio::Player,
     receiver: Receiver<Packet>,
     sender: Sender<StatusPacket>,
     index: usize,
@@ -24,7 +23,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(song_paths: Vec<String>, sink: Sink, receiver: Receiver<Packet>, sender: Sender<StatusPacket>) -> Self {
+    pub fn new(song_paths: Vec<String>, sink: rodio::Player, receiver: Receiver<Packet>, sender: Sender<StatusPacket>) -> Self {
         let player = Self { songs: song_paths, sink, receiver, sender, index: 0, looping: false, rng: thread_rng() };
         player.pause();
         player.queue_song(0);
@@ -33,7 +32,7 @@ impl Player {
 
     fn queue_song(&self, song_index: usize) {
         let file = BufReader::new(File::open(&self.songs[song_index]).unwrap());
-        let source = Decoder::new(file).unwrap();
+        let source = rodio::Decoder::new(file).unwrap();
         self.sink.append(source);
     }
 

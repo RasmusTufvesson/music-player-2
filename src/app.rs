@@ -66,57 +66,65 @@ impl eframe::App for App {
                 }
             }
         }
+
+        let mut tab_changed = false;
+
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
                 if ui.button("Controls").clicked() {
                     self.tab = Tab::Controls;
+                    tab_changed = true;
                 }
                 if ui.button("Songs").clicked() {
                     self.tab = Tab::Songs;
+                    tab_changed = true;
                 }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                    ui.add(egui::Label::new(&self.songs[self.index]).selectable(false).truncate().show_tooltip_when_elided(true));
+                });
             });
         });
-        if self.tab == Tab::Controls {
-            egui::SidePanel::left("side_panel").exact_width(20.).resizable(false).show(ctx, |ui| {
-                ui.add_space(ui.spacing().item_spacing.y);
-                ui.spacing_mut().slider_width = ui.available_height() - ui.spacing().item_spacing.y;
-                if ui.add(egui::Slider::new(&mut self.volume, 0.0..=1.5).show_value(false).vertical()).changed() {
-                    self.sender.send(Packet::Volume(self.volume)).unwrap();
-                }
-            });
-        }
         egui::CentralPanel::default().show(ctx, |ui| {
             match self.tab {
                 Tab::Controls => {
-                    ui.with_layout(egui::Layout { main_dir: egui::Direction::TopDown, main_wrap: false, main_align: eframe::emath::Align::Min, main_justify: false, cross_align: eframe::emath::Align::Center, cross_justify: true }, |ui: &mut egui::Ui| {
-                        ui.add(Label::new(RichText::new(&self.songs[self.index]).heading()).selectable(false).truncate(true));
-                        if ui.button(match self.paused {
+                    let size = (ui.available_width() - ui.spacing().item_spacing.x) / 2.0;
+                    egui::Grid::new("controls").min_col_width(size).num_columns(2).show(ui, |ui| {
+                        if ui.add_sized([size, 20.0], egui::Button::new(match self.paused {
                             true => "Play",
                             false => "Pause",
-                        }).clicked() {
+                        })).clicked() {
                             self.sender.send(Packet::Pause).unwrap();
                             self.paused = !self.paused;
                         }
-                        if ui.button("Skip").clicked() {
+                        if ui.add_sized([size, 20.0], egui::Button::new(match self.looping {
+                            true => "Don't Loop",
+                            false => "Loop",
+                        })).clicked() {
+                            self.sender.send(Packet::Loop).unwrap();
+                            self.looping = !self.looping;
+                        }
+                        ui.end_row();
+                        if ui.add_sized([size, 20.0], egui::Button::new("Skip")).clicked() {
                             self.sender.send(Packet::Skip).unwrap();
                         }
-                        if ui.checkbox(&mut self.looping, "Loop").changed() {
-                            self.sender.send(Packet::Loop).unwrap();
-                        }
-                    });
-                }
-                Tab::Songs => {
-                    ui.with_layout(egui::Layout { main_dir: egui::Direction::TopDown, main_wrap: false, main_align: eframe::emath::Align::Min, main_justify: false, cross_align: eframe::emath::Align::Center, cross_justify: true }, |ui: &mut egui::Ui| {
-                        if ui.button("Shuffle").clicked() {
+                        if ui.add_sized([size, 20.0], egui::Button::new("Shuffle")).clicked() {
                             self.sender.send(Packet::Shuffle).unwrap();
                         }
                     });
-                    ui.add_space(ui.spacing().item_spacing.y);
+                    ui.spacing_mut().slider_width = ui.available_width();
+                    if ui.add(egui::Slider::new(&mut self.volume, 0.0..=1.0).show_value(false)).changed() {
+                        self.sender.send(Packet::Volume(self.volume.powi(2) * 1.5)).unwrap();
+                    }
+                }
+                Tab::Songs => {
                     egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
                         egui::Grid::new("songs").show(ui, |ui| {
                             for (i, song) in self.songs.iter().enumerate() {
                                 if i == self.index {
-                                    ui.add(Label::new(RichText::new(song).strong()).selectable(false));
+                                    let response = ui.add(Label::new(RichText::new(song).strong()).selectable(false));
+                                    if tab_changed {
+                                        response.scroll_to_me(Some(egui::Align::Min));
+                                    }
                                 } else {
                                     if ui.add(Label::new(song).sense(Sense::click()).selectable(false)).clicked() {
                                         self.sender.send(Packet::Play(i)).unwrap();
@@ -135,10 +143,10 @@ impl eframe::App for App {
 
 pub fn main(sender: Sender<Packet>, receiver: Receiver<StatusPacket>, songs: Vec<String>) -> eframe::Result<()> {
     let mut native_options = eframe::NativeOptions::default();
-    native_options.viewport.inner_size = Some(Vec2::new(300., 120.));
+    native_options.viewport.inner_size = Some(Vec2::new(275., 98.));
     eframe::run_native(
         "Music Player",
         native_options,
-        Box::new(|cc| Box::new(App::new(cc, sender, receiver, songs))),
+        Box::new(|cc| Ok(Box::new(App::new(cc, sender, receiver, songs)))),
     )
 }

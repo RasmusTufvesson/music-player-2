@@ -10,4 +10,4 @@ All you have to do is create a `config.json` file that looks something like this
 }
 ```
 
-The actual ui of the program is pretty easy to figure out, there are two tabs, "Controls" and "Songs". In the controls tab you will find the general controls like pausing and skipping songs. Meanwhile in the songs tab you there is a list of the songs playing where you can skip to any song or shuffle all of them.
+The actual ui of the program is pretty easy to figure out, there are two tabs, "Controls" and "Songs". In the controls tab you will find the general controls like pausing and skipping songs. Meanwhile in the songs tab you can see every song and play a specific one.
