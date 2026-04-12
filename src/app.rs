@@ -41,28 +41,33 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        match self.receiver.try_recv() {
-            Ok(packet) => {
-                match packet {
-                    StatusPacket::NextSong => {
-                        self.index += 1;
-                        if self.index == self.songs.len() {
+        let mut empty = false;
+        while !empty {
+            match self.receiver.try_recv() {
+                Ok(packet) => {
+                    match packet {
+                        StatusPacket::NextSong => {
+                            self.index += 1;
+                            if self.index == self.songs.len() {
+                                self.index = 0;
+                            }
+                        }
+                        StatusPacket::Shuffle(vec) => {
+                            let shuffled = vec.iter().map(|x| self.songs[*x].clone()).collect();
+                            self.songs = shuffled;
                             self.index = 0;
                         }
                     }
-                    StatusPacket::Shuffle(vec) => {
-                        let shuffled = vec.iter().map(|x| self.songs[*x].clone()).collect();
-                        self.songs = shuffled;
-                        self.index = 0;
-                    }
                 }
-            }
-            Err(error) => {
-                match error {
-                    TryRecvError::Disconnected => {
-                        panic!("Player status channel disconnected")
+                Err(error) => {
+                    match error {
+                        TryRecvError::Disconnected => {
+                            panic!("Player status channel disconnected")
+                        }
+                        TryRecvError::Empty => {
+                            empty = true;
+                        }
                     }
-                    TryRecvError::Empty => {}
                 }
             }
         }
