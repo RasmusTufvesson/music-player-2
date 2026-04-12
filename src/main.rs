@@ -1,4 +1,6 @@
-use std::{fs, sync::mpsc::channel, thread};
+#![windows_subsystem = "windows"]
+
+use std::{env, fs, sync::mpsc::channel, thread};
 use music::Player;
 use serde::Deserialize;
 
@@ -11,7 +13,7 @@ struct Config {
 }
 
 fn main() {
-    let config: Config = serde_json::from_str(&fs::read_to_string("config.json").unwrap()).unwrap();
+    let config: Config = serde_json::from_str(&fs::read_to_string(env::current_exe().unwrap().parent().unwrap().join("config.json")).unwrap()).unwrap();
     let mut files = vec![];
     let mut names = vec![];
     for path in fs::read_dir(&config.song_folder).unwrap().map(|x| x.unwrap().path()).filter(|x| x.extension().is_some_and(|x| x == "mp3")) {
